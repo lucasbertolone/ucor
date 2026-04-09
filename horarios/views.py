@@ -1,0 +1,103 @@
+from django.shortcuts import render
+from django.contrib.auth.models import User
+from .models import BloqueHorario
+from datetime import datetime
+import pytz
+from django.shortcuts import render, redirect 
+from .utils import sincronizar_desde_url
+import json 
+
+def estado_amigos(request):
+    # 1. Obtenemos la hora actual en Chile
+    tz = pytz.timezone('America/Santiago')
+    ahora = datetime.now(tz)
+    
+    # 2. Traducimos el día actual de Python (0=Lunes) al formato de nuestra base de datos (MO, TU...)
+    dias_map = {0: 'MO', 1: 'TU', 2: 'WE', 3: 'TH', 4: 'FR', 5: 'SA', 6: 'SU'}
+    dia_actual = dias_map[ahora.weekday()]
+    hora_actual = ahora.time()
+
+    # 3. EL ALGORITMO MAGICO: Buscar quién está en clase AHORA
+    # Filtramos: Día = Hoy, Hora Inicio <= Ahora, Hora Fin >= Ahora
+    clases_actuales = BloqueHorario.objects.filter(
+        dia_semana=dia_actual,
+        hora_inicio__lte=hora_actual,
+        hora_fin__gte=hora_actual
+    )
+    
+    # 4. Separamos a los amigos ocupados de los libres
+    usuarios_ocupados = clases_actuales.values_list('usuario', flat=True)
+    amigos_libres = User.objects.exclude(id__in=usuarios_ocupados)
+
+    # 5. Empaquetamos todo para enviarlo a la página web
+    contexto = {
+        'hora_actual': hora_actual.strftime("%H:%M"),
+        'clases_actuales': clases_actuales,
+        'amigos_libres': amigos_libres,
+    }
+    return render(request, 'estado.html', contexto)
+
+def agregar_horario(request):
+    # Si el usuario apretó el botón "Enviar" en el formulario:
+    if request.method == 'POST':
+        nombre = request.POST.get('nombre')
+        url = request.POST.get('url_horario')
+        
+        try:
+            # Mandamos a llamar al algoritmo
+            sincronizar_desde_url(url, nombre)
+            # Si todo sale bien, lo redirigimos a la pantalla principal
+            return redirect('/')
+        except Exception as e:
+            # Si el link es inválido, le mostramos un error
+            return render(request, 'agregar.html', {'error': "Error al leer el link. Verifica que sea correcto."})
+
+    # Si el usuario recién entra a la página (GET), mostramos el formulario vacío
+    return render(request, 'agregar.html')
+
+
+def comparador_horarios(request):
+    # 1. Obtenemos a todos los usuarios para la lista de selección
+    todos_los_usuarios = User.objects.all()
+    
+    # 2. Vemos qué amigos seleccionaste en el formulario
+    amigos_seleccionados = request.GET.getlist('amigos')
+    
+    # 3. Filtramos los bloques: si elegiste amigos, mostramos esos. Si no, mostramos todos por defecto.
+    if amigos_seleccionados:
+        bloques = BloqueHorario.objects.filter(usuario__username__in=amigos_seleccionados)
+    else:
+        bloques = BloqueHorario.objects.all()
+
+    # 4. Traducimos los días de tu base de datos al formato numérico de FullCalendar (0=Domingo, 1=Lunes...)
+    mapa_dias = {'SU': 0, 'MO': 1, 'TU': 2, 'WE': 3, 'TH': 4, 'FR': 5, 'SA': 6}
+    
+    # Paleta de colores para diferenciar a los amigos
+    paleta_colores = ['#0d6efd', '#198754', '#dc3545', '#ffc107', '#0dcaf0', '#6f42c1']
+    color_usuario = {}
+    
+    # 5. Armamos la lista de eventos en formato JSON
+    eventos_calendario = []
+    for i, bloque in enumerate(bloques):
+        nombre_amigo = bloque.usuario.username
+        
+        # Le asignamos un color único a cada amigo
+        if nombre_amigo not in color_usuario:
+            color_usuario[nombre_amigo] = paleta_colores[len(color_usuario) % len(paleta_colores)]
+
+        eventos_calendario.append({
+            'title': f"{nombre_amigo}: {bloque.ramo}",
+            'startTime': bloque.hora_inicio.strftime('%H:%M:%S'),
+            'endTime': bloque.hora_fin.strftime('%H:%M:%S'),
+            'daysOfWeek': [mapa_dias[bloque.dia_semana]],
+            'color': color_usuario[nombre_amigo],
+            'description': bloque.sala
+        })
+
+    contexto = {
+        'usuarios': todos_los_usuarios,
+        'seleccionados': amigos_seleccionados,
+        # Convertimos la lista de Python a un string JSON seguro para JavaScript
+        'eventos_json': json.dumps(eventos_calendario) 
+    }
+    return render(request, 'comparador.html', contexto)
