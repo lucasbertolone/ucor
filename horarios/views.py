@@ -55,8 +55,48 @@ def agregar_horario(request):
     # Si el usuario recién entra a la página (GET), mostramos el formulario vacío
     return render(request, 'agregar.html')
 
-
 def comparador_horarios(request):
+    todos_los_usuarios = User.objects.all()
+    amigos_seleccionados = request.GET.getlist('amigos')
+    
+    if amigos_seleccionados:
+        bloques = BloqueHorario.objects.filter(usuario__username__in=amigos_seleccionados)
+    else:
+        bloques = BloqueHorario.objects.all()
+
+    paleta_colores = ['#0d6efd', '#198754', '#dc3545', '#ffc107', '#0dcaf0', '#6f42c1']
+    color_usuario = {}
+    
+    eventos_calendario = []
+    for bloque in bloques:
+        nombre_amigo = bloque.usuario.username
+        
+        if nombre_amigo not in color_usuario:
+            color_usuario[nombre_amigo] = paleta_colores[len(color_usuario) % len(paleta_colores)]
+
+        # Validamos que el bloque tenga fecha antes de procesarlo
+        if bloque.fecha:
+            # Combinamos fecha y hora en formato ISO: "YYYY-MM-DDTHH:MM:SS"
+            inicio_iso = f"{bloque.fecha.isoformat()}T{bloque.hora_inicio.strftime('%H:%M:%S')}"
+            fin_iso = f"{bloque.fecha.isoformat()}T{bloque.hora_fin.strftime('%H:%M:%S')}"
+
+            eventos_calendario.append({
+                'title': f"{nombre_amigo}: {bloque.ramo}",
+                'start': inicio_iso,
+                'end': fin_iso,
+                'color': color_usuario[nombre_amigo],
+                'extendedProps': {
+                    'sala': bloque.sala,
+                    'usuario': nombre_amigo
+                }
+            })
+
+    contexto = {
+        'usuarios': todos_los_usuarios,
+        'seleccionados': amigos_seleccionados,
+        'eventos_json': json.dumps(eventos_calendario) 
+    }
+    return render(request, 'comparador.html', contexto)
     # 1. Obtenemos a todos los usuarios para la lista de selección
     todos_los_usuarios = User.objects.all()
     
@@ -78,22 +118,21 @@ def comparador_horarios(request):
     
     # 5. Armamos la lista de eventos en formato JSON
     eventos_calendario = []
-    for i, bloque in enumerate(bloques):
-        nombre_amigo = bloque.usuario.username
-        
-        # Le asignamos un color único a cada amigo
-        if nombre_amigo not in color_usuario:
-            color_usuario[nombre_amigo] = paleta_colores[len(color_usuario) % len(paleta_colores)]
+    for bloque in bloques:
+        if not bloque.fecha: continue
+
+        # Combinamos fecha y hora para crear un punto exacto en el tiempo
+        start_iso = f"{bloque.fecha.isoformat()}T{bloque.hora_inicio.strftime('%H:%M:%S')}"
+        end_iso = f"{bloque.fecha.isoformat()}T{bloque.hora_fin.strftime('%H:%M:%S')}"
 
         eventos_calendario.append({
-            'title': f"{nombre_amigo}: {bloque.ramo}",
-            'startTime': bloque.hora_inicio.strftime('%H:%M:%S'),
-            'endTime': bloque.hora_fin.strftime('%H:%M:%S'),
-            'daysOfWeek': [mapa_dias[bloque.dia_semana]],
-            'color': color_usuario[nombre_amigo],
+            'title': f"{bloque.usuario.username}: {bloque.ramo}",
+            'start': start_iso, # Usamos 'start' en lugar de 'startTime'
+            'end': end_iso,     # Usamos 'end' en lugar de 'endTime'
+                'color': color_usuario.get(bloque.usuario.username, '#0d6efd'),
             'description': bloque.sala
         })
-
+        # Asignamos un color a cada usuario (si no tiene, le damos uno de la paleta)
     contexto = {
         'usuarios': todos_los_usuarios,
         'seleccionados': amigos_seleccionados,
