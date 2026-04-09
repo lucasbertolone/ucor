@@ -8,28 +8,28 @@ from .utils import sincronizar_desde_url
 import json 
 
 def estado_amigos(request):
-    # 1. Obtenemos la hora actual en Chile
+    # 1. Obtenemos la fecha y hora actual en Chile
     tz = pytz.timezone('America/Santiago')
     ahora = datetime.now(tz)
     
-    # 2. Traducimos el día actual de Python (0=Lunes) al formato de nuestra base de datos (MO, TU...)
-    dias_map = {0: 'MO', 1: 'TU', 2: 'WE', 3: 'TH', 4: 'FR', 5: 'SA', 6: 'SU'}
-    dia_actual = dias_map[ahora.weekday()]
+    # Extraemos la fecha exacta de hoy y la hora
+    fecha_hoy = ahora.date()
     hora_actual = ahora.time()
 
-    # 3. EL ALGORITMO MAGICO: Buscar quién está en clase AHORA
-    # Filtramos: Día = Hoy, Hora Inicio <= Ahora, Hora Fin >= Ahora
+    # 2. ALGORITMO CORREGIDO: Buscar quién está en clase JUSTO HOY y AHORA
+    # Agregamos el filtro fecha=fecha_hoy para evitar duplicados de otras semanas
     clases_actuales = BloqueHorario.objects.filter(
-        dia_semana=dia_actual,
+        fecha=fecha_hoy,
         hora_inicio__lte=hora_actual,
         hora_fin__gte=hora_actual
     )
     
-    # 4. Separamos a los amigos ocupados de los libres
-    usuarios_ocupados = clases_actuales.values_list('usuario', flat=True)
-    amigos_libres = User.objects.exclude(id__in=usuarios_ocupados)
+    # 3. Separamos a los amigos ocupados de los libres
+    # Usamos distinct() para asegurar que cada usuario aparezca una sola vez
+    usuarios_ocupados_ids = clases_actuales.values_list('usuario', flat=True).distinct()
+    amigos_libres = User.objects.exclude(id__in=usuarios_ocupados_ids)
 
-    # 5. Empaquetamos todo para enviarlo a la página web
+    # 4. Empaquetamos para el template
     contexto = {
         'hora_actual': hora_actual.strftime("%H:%M"),
         'clases_actuales': clases_actuales,
