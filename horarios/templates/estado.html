@@ -7,7 +7,6 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
 </head>
 <body class="bg-light">
-
     <nav class="navbar navbar-dark bg-dark mb-4">
         <div class="container-fluid justify-content-center">
             <span class="navbar-brand mb-0 h1 fs-2">🎓 UCor</span>
@@ -15,59 +14,107 @@
     </nav>
 
     <div class="container" style="max-width: 600px;">
-        <div class="text-center mb-4">
-            <h5 class="text-muted">Estado de tus amigos a las</h5>
-            <h2 class="display-5 fw-bold">{{ hora_actual }}</h2>
-        </div>
 
-        <div class="card border-success mb-4 shadow-sm">
-            <div class="card-header bg-success text-white fw-bold">
-                🟢 Amigos Libres 
+        {% if not grupo %}
+        <!-- Buscador de grupo -->
+        <div class="card shadow-sm border-0 mb-4">
+            <div class="card-body">
+                <form method="GET" class="d-flex gap-2">
+                    <input type="text" name="codigo" value="{{ codigo }}"
+                           class="form-control form-control-lg text-center fw-bold"
+                           placeholder="Código del grupo (ej: UCO-4X7K)"
+                           style="letter-spacing: 2px; text-transform: uppercase;">
+                    <button type="submit" class="btn btn-dark btn-lg px-4">Ver</button>
+                </form>
+                {% if error_codigo %}
+                    <div class="alert alert-danger mt-3 mb-0">{{ error_codigo }}</div>
+                {% endif %}
             </div>
-            <ul class="list-group list-group-flush">
-                {% for amigo in amigos_libres %}
-                    <li class="list-group-item d-flex justify-content-between align-items-center">
-                        <span class="fw-bold fs-5">{{ amigo.username }}</span>
-                        <span class="badge bg-success rounded-pill">Libre</span>
-                    </li>
-                {% empty %}
-                    <li class="list-group-item text-muted text-center py-3">
-                        Todos están ocupados en este momento :(
-                    </li>
-                {% endfor %}
-            </ul>
         </div>
+        {% endif %}
 
-        <div class="card border-danger mb-4 shadow-sm">
-            <div class="card-header bg-danger text-white fw-bold">
-                🔴 En Clases 
+        {% if grupo %}
+            <!-- Header del grupo -->
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <div>
+                    <h5 class="text-muted mb-0">{{ grupo.nombre }}</h5>
+                    <h2 class="display-5 fw-bold mb-0">{{ hora_actual }}</h2>
+                </div>
+                <a href="/cambiar-grupo/" class="btn btn-outline-secondary btn-sm">
+                    Cambiar grupo
+                </a>
             </div>
-            <ul class="list-group list-group-flush">
-                {% for clase in clases_actuales %}
-                    <li class="list-group-item">
-                        <div class="d-flex justify-content-between align-items-center mb-1">
-                            <span class="fw-bold fs-5">{{ clase.usuario.username }}</span>
-                            <span class="badge bg-danger">Hasta {{ clase.hora_fin|time:"H:i" }}</span>
-                        </div>
-                        <div class="text-muted small">
-                            📚 {{ clase.ramo }} <br>
-                            📍 {{ clase.sala }}
-                        </div>
-                    </li>
-                {% empty %}
-                    <li class="list-group-item text-muted text-center py-3">
-                        Nadie tiene clases ahora 
-                    </li>
-                {% endfor %}
-            </ul>
-        </div>
 
-        <div class="text-center mt-4 mb-5">
-            <a href="/agregar/" class="btn btn-outline-dark btn-lg w-100 shadow-sm">
-                ➕ Agregar nuevo horario
-            </a>
-        </div>
+            <!-- En Clases -->
+            <div class="card border-danger mb-4 shadow-sm">
+                <div class="card-header bg-danger text-white fw-bold">📚 En Clases</div>
+                <ul class="list-group list-group-flush">
+                    {% for clase in clases_actuales %}
+                        <li class="list-group-item">
+                            <div class="d-flex justify-content-between align-items-center mb-1">
+                                <span class="fw-bold fs-5">{{ clase.usuario.username }}</span>
+                                <span class="badge bg-danger">Hasta {{ clase.hora_fin|time:"H:i" }}</span>
+                            </div>
+                            <div class="text-muted small">
+                                📖 {{ clase.ramo }}<br>
+                                📍 {{ clase.sala }}
+                            </div>
+                        </li>
+                    {% empty %}
+                        <li class="list-group-item text-muted text-center py-3">Nadie tiene clases ahora 🎉</li>
+                    {% endfor %}
+                </ul>
+            </div>
+
+            <!-- Libres -->
+            <div class="card border-success mb-4 shadow-sm">
+                <div class="card-header bg-success text-white fw-bold">✅ Libres en la U</div>
+                <ul class="list-group list-group-flush">
+                    {% for amigo in amigos_libres %}
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            <span class="fw-bold fs-5">{{ amigo.username }}</span>
+                            <span class="badge bg-success rounded-pill">Libre</span>
+                        </li>
+                    {% empty %}
+                        <li class="list-group-item text-muted text-center py-3">Nadie libre en la U ahora</li>
+                    {% endfor %}
+                </ul>
+            </div>
+
+            <!-- En Casa -->
+            <div class="card border-secondary mb-4 shadow-sm">
+                <div class="card-header bg-secondary text-white fw-bold">🏠 En Casa</div>
+                <ul class="list-group list-group-flush">
+                    {% for amigo in amigos_en_casa %}
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            <span class="fw-bold fs-5">{{ amigo.username }}</span>
+                            <span class="badge bg-secondary rounded-pill">En casa</span>
+                        </li>
+                    {% empty %}
+                        <li class="list-group-item text-muted text-center py-3">Todos tienen actividad hoy 📅</li>
+                    {% endfor %}
+                </ul>
+            </div>
+
+            <!-- Botones -->
+            <div class="d-grid gap-2 mt-4 mb-5">
+                <a href="/agregar/?codigo={{ codigo }}" class="btn btn-outline-dark btn-lg shadow-sm">
+                    ➕ Agregar mi horario a este grupo
+                </a>
+                <a href="/comparador/?codigo={{ codigo }}" class="btn btn-outline-primary btn-lg shadow-sm">
+                    📅 Ver comparador de horarios
+                </a>
+            </div>
+
+        {% else %}
+            <div class="text-center py-5 text-muted">
+                <div style="font-size: 4rem;">👥</div>
+                <h4 class="mt-3">Ingresá el código de tu grupo para ver el estado de tus amigos</h4>
+                <p class="mt-2">¿No tenés un grupo todavía?</p>
+                <a href="/crear-grupo/" class="btn btn-dark btn-lg mt-2">Crear un grupo nuevo</a>
+            </div>
+        {% endif %}
+
     </div>
-
 </body>
 </html>

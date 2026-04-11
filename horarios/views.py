@@ -1,85 +1,174 @@
-from django.shortcuts import render
+from django.shortcuts import render, redirect
 from django.contrib.auth.models import User
-from .models import BloqueHorario
+from .models import BloqueHorario, Grupo
 from datetime import datetime
 import pytz
-from django.shortcuts import render, redirect 
 from .utils import sincronizar_desde_url
-import json 
+import json
 
 def estado_amigos(request):
-    # 1. Obtenemos la fecha y hora actual en Chile
+    # Primero miramos si viene un código en la URL, si no, usamos la cookie
+    codigo = request.GET.get('codigo', '').strip().upper()
+    if not codigo:
+        codigo = request.COOKIES.get('ucor_grupo', '')
+
+    grupo = None
+    error_codigo = None
+
+    if codigo:
+        try:
+            grupo = Grupo.objects.get(codigo=codigo)
+            usuarios = grupo.miembros.all()
+        except Grupo.DoesNotExist:
+            error_codigo = f"No existe ningún grupo con el código '{codigo}'."
+            usuarios = User.objects.none()
+            codigo = ''  # Limpiamos para no guardar un código inválido
+    else:
+        usuarios = User.objects.none()
+
     tz = pytz.timezone('America/Santiago')
     ahora = datetime.now(tz)
-    
-    # Extraemos la fecha exacta de hoy y la hora
     fecha_hoy = ahora.date()
     hora_actual = ahora.time()
 
-    # 2. ALGORITMO CORREGIDO: Buscar quién está en clase JUSTO HOY y AHORA
-    # Agregamos el filtro fecha=fecha_hoy para evitar duplicados de otras semanas
     clases_actuales = BloqueHorario.objects.filter(
         fecha=fecha_hoy,
         hora_inicio__lte=hora_actual,
-        hora_fin__gte=hora_actual
+        hora_fin__gte=hora_actual,
+        usuario__in=usuarios
     )
-    
-    # 3. Separamos a los amigos ocupados de los libres
-    # Usamos distinct() para asegurar que cada usuario aparezca una sola vez
-    usuarios_ocupados_ids = clases_actuales.values_list('usuario', flat=True).distinct()
-    amigos_libres = User.objects.exclude(id__in=usuarios_ocupados_ids)
+    usuarios_en_clase_ids = set(clases_actuales.values_list('usuario', flat=True).distinct())
 
-    # 4. Empaquetamos para el template
+    amigos_libres = []
+    amigos_en_casa = []
+
+    for usuario in usuarios.exclude(id__in=usuarios_en_clase_ids):
+        clases_hoy = BloqueHorario.objects.filter(
+            usuario=usuario,
+            fecha=fecha_hoy
+        ).order_by('hora_inicio')
+
+        if not clases_hoy.exists():
+            amigos_en_casa.append(usuario)
+            continue
+
+        primera_clase = clases_hoy.first().hora_inicio
+        ultima_clase = clases_hoy.last().hora_fin
+
+        if hora_actual < primera_clase or hora_actual > ultima_clase:
+            amigos_en_casa.append(usuario)
+        else:
+            amigos_libres.append(usuario)
+
     contexto = {
         'hora_actual': hora_actual.strftime("%H:%M"),
         'clases_actuales': clases_actuales,
         'amigos_libres': amigos_libres,
+        'amigos_en_casa': amigos_en_casa,
+        'grupo': grupo,
+        'codigo': codigo,
+        'error_codigo': error_codigo,
     }
-    return render(request, 'estado.html', contexto)
+
+    response = render(request, 'estado.html', contexto)
+
+    # Guardamos el código en una cookie si es válido (dura 1 año)
+    if codigo and grupo:
+        response.set_cookie('ucor_grupo', codigo, max_age=60*60*24*365)
+    elif error_codigo:
+        # Si el código es inválido, borramos la cookie
+        response.delete_cookie('ucor_grupo')
+
+    return response
+
+
+def crear_grupo(request):
+    if request.method == 'POST':
+        nombre = request.POST.get('nombre', '').strip()
+        if nombre:
+            grupo = Grupo.objects.create(nombre=nombre)
+            return redirect(f'/grupo-creado/?codigo={grupo.codigo}')
+        return render(request, 'crear_grupo.html', {'error': 'Poné un nombre para el grupo.'})
+    return render(request, 'crear_grupo.html')
+
+
+def grupo_creado(request):
+    codigo = request.GET.get('codigo', '')
+    try:
+        grupo = Grupo.objects.get(codigo=codigo)
+    except Grupo.DoesNotExist:
+        return redirect('/')
+    return render(request, 'grupo_creado.html', {'grupo': grupo})
+
 
 def agregar_horario(request):
-    # Si el usuario apretó el botón "Enviar" en el formulario:
     if request.method == 'POST':
-        nombre = request.POST.get('nombre')
-        url = request.POST.get('url_horario')
-        
-        try:
-            # Mandamos a llamar al algoritmo
-            sincronizar_desde_url(url, nombre)
-            # Si todo sale bien, lo redirigimos a la pantalla principal
-            return redirect('/')
-        except Exception as e:
-            # Si el link es inválido, le mostramos un error
-            return render(request, 'agregar.html', {'error': "Error al leer el link. Verifica que sea correcto."})
+        nombre = request.POST.get('nombre', '').strip()
+        url = request.POST.get('url_horario', '').strip()
+        codigo = request.POST.get('codigo_grupo', '').strip().upper()
 
-    # Si el usuario recién entra a la página (GET), mostramos el formulario vacío
-    return render(request, 'agregar.html')
+        try:
+            grupo = Grupo.objects.get(codigo=codigo)
+        except Grupo.DoesNotExist:
+            return render(request, 'agregar.html', {
+                'error': f"El código '{codigo}' no existe. Pedile el código correcto a quien creó el grupo.",
+                'codigo_previo': codigo,
+            })
+
+        try:
+            sincronizar_desde_url(url, nombre)
+            usuario = User.objects.get(username=nombre)
+            grupo.miembros.add(usuario)
+            response = redirect(f'/?codigo={codigo}')
+            return response
+        except Exception as e:
+            return render(request, 'agregar.html', {
+                'error': 'Error al leer el link. Verificá que sea correcto.',
+                'codigo_previo': codigo,
+            })
+
+    # Si viene de un grupo, prellenamos el código
+    codigo_previo = request.GET.get('codigo', '') or request.COOKIES.get('ucor_grupo', '')
+    return render(request, 'agregar.html', {'codigo_previo': codigo_previo})
+
 
 def comparador_horarios(request):
-    todos_los_usuarios = User.objects.all()
-    amigos_seleccionados = request.GET.getlist('amigos')
-    
-    if amigos_seleccionados:
-        bloques = BloqueHorario.objects.filter(usuario__username__in=amigos_seleccionados)
+    codigo = request.GET.get('codigo', '').strip().upper()
+    if not codigo:
+        codigo = request.COOKIES.get('ucor_grupo', '')
+
+    grupo = None
+
+    if codigo:
+        try:
+            grupo = Grupo.objects.get(codigo=codigo)
+            todos_los_usuarios = grupo.miembros.all()
+        except Grupo.DoesNotExist:
+            todos_los_usuarios = User.objects.none()
     else:
-        bloques = BloqueHorario.objects.all()
+        todos_los_usuarios = User.objects.all()
+
+    amigos_seleccionados = request.GET.getlist('amigos')
+
+    if amigos_seleccionados:
+        bloques = BloqueHorario.objects.filter(
+            usuario__username__in=amigos_seleccionados,
+            usuario__in=todos_los_usuarios
+        )
+    else:
+        bloques = BloqueHorario.objects.filter(usuario__in=todos_los_usuarios)
 
     paleta_colores = ['#0d6efd', '#198754', '#dc3545', '#ffc107', '#0dcaf0', '#6f42c1']
     color_usuario = {}
-    
     eventos_calendario = []
+
     for bloque in bloques:
         nombre_amigo = bloque.usuario.username
-        
         if nombre_amigo not in color_usuario:
             color_usuario[nombre_amigo] = paleta_colores[len(color_usuario) % len(paleta_colores)]
-
-        # Validamos que el bloque tenga fecha antes de procesarlo
         if bloque.fecha:
-            # Combinamos fecha y hora en formato ISO: "YYYY-MM-DDTHH:MM:SS"
             inicio_iso = f"{bloque.fecha.isoformat()}T{bloque.hora_inicio.strftime('%H:%M:%S')}"
             fin_iso = f"{bloque.fecha.isoformat()}T{bloque.hora_fin.strftime('%H:%M:%S')}"
-
             eventos_calendario.append({
                 'title': f"{nombre_amigo}: {bloque.ramo}",
                 'start': inicio_iso,
@@ -94,49 +183,15 @@ def comparador_horarios(request):
     contexto = {
         'usuarios': todos_los_usuarios,
         'seleccionados': amigos_seleccionados,
-        'eventos_json': json.dumps(eventos_calendario) 
+        'eventos_json': json.dumps(eventos_calendario),
+        'grupo': grupo,
+        'codigo': codigo,
     }
     return render(request, 'comparador.html', contexto)
-    # 1. Obtenemos a todos los usuarios para la lista de selección
-    todos_los_usuarios = User.objects.all()
-    
-    # 2. Vemos qué amigos seleccionaste en el formulario
-    amigos_seleccionados = request.GET.getlist('amigos')
-    
-    # 3. Filtramos los bloques: si elegiste amigos, mostramos esos. Si no, mostramos todos por defecto.
-    if amigos_seleccionados:
-        bloques = BloqueHorario.objects.filter(usuario__username__in=amigos_seleccionados)
-    else:
-        bloques = BloqueHorario.objects.all()
 
-    # 4. Traducimos los días de tu base de datos al formato numérico de FullCalendar (0=Domingo, 1=Lunes...)
-    mapa_dias = {'SU': 0, 'MO': 1, 'TU': 2, 'WE': 3, 'TH': 4, 'FR': 5, 'SA': 6}
-    
-    # Paleta de colores para diferenciar a los amigos
-    paleta_colores = ['#0d6efd', '#198754', '#dc3545', '#ffc107', '#0dcaf0', '#6f42c1']
-    color_usuario = {}
-    
-    # 5. Armamos la lista de eventos en formato JSON
-    eventos_calendario = []
-    for bloque in bloques:
-        if not bloque.fecha: continue
 
-        # Combinamos fecha y hora para crear un punto exacto en el tiempo
-        start_iso = f"{bloque.fecha.isoformat()}T{bloque.hora_inicio.strftime('%H:%M:%S')}"
-        end_iso = f"{bloque.fecha.isoformat()}T{bloque.hora_fin.strftime('%H:%M:%S')}"
-
-        eventos_calendario.append({
-            'title': f"{bloque.usuario.username}: {bloque.ramo}",
-            'start': start_iso, # Usamos 'start' en lugar de 'startTime'
-            'end': end_iso,     # Usamos 'end' en lugar de 'endTime'
-                'color': color_usuario.get(bloque.usuario.username, '#0d6efd'),
-            'description': bloque.sala
-        })
-        # Asignamos un color a cada usuario (si no tiene, le damos uno de la paleta)
-    contexto = {
-        'usuarios': todos_los_usuarios,
-        'seleccionados': amigos_seleccionados,
-        # Convertimos la lista de Python a un string JSON seguro para JavaScript
-        'eventos_json': json.dumps(eventos_calendario) 
-    }
-    return render(request, 'comparador.html', contexto)
+def cambiar_grupo(request):
+    """Borra la cookie del grupo y manda al inicio"""
+    response = redirect('/')
+    response.delete_cookie('ucor_grupo')
+    return response
