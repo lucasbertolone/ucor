@@ -87,7 +87,7 @@ def crear_grupo(request):
         nombre = request.POST.get('nombre', '').strip()
         if nombre:
             grupo = Grupo.objects.create(nombre=nombre)
-            return redirect(f'https://ucor-production.up.railway.app/grupo-creado/?codigo={grupo.codigo}')
+            return render(request, 'crear_grupo.html', {'grupo': grupo})
         return render(request, 'crear_grupo.html', {'error': 'Poné un nombre para el grupo.'})
     return render(request, 'crear_grupo.html')
 
@@ -111,7 +111,7 @@ def agregar_horario(request):
             grupo = Grupo.objects.get(codigo=codigo)
         except Grupo.DoesNotExist:
             return render(request, 'agregar.html', {
-                'error': f"El código '{codigo}' no existe. Pide el código correcto a quien creó el grupo.",
+                'error': f"El código '{codigo}' no existe. Pedile el código correcto a quien creó el grupo.",
                 'codigo_previo': codigo,
             })
 
@@ -123,7 +123,7 @@ def agregar_horario(request):
             return response
         except Exception as e:
             return render(request, 'agregar.html', {
-                'error': 'Error al leer el link. Verifica que sea correcto.',
+                'error': 'Error al leer el link. Verificá que sea correcto.',
                 'codigo_previo': codigo,
             })
 

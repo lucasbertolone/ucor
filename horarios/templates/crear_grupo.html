@@ -13,29 +13,75 @@
         </div>
     </nav>
     <div class="container" style="max-width: 500px;">
-        <div class="card shadow-sm border-0">
-            <div class="card-body p-4">
-                <h3 class="card-title text-center mb-4 fw-bold">Crear un grupo 👥</h3>
-                {% if error %}
-                    <div class="alert alert-danger">{{ error }}</div>
-                {% endif %}
-                <form method="POST">
-                    {% csrf_token %}
-                    <div class="mb-4">
-                        <label class="form-label fw-bold">Nombre del grupo:</label>
-                        <input type="text" name="nombre" class="form-control form-control-lg"
-                               required placeholder="Ej: rancagua 4ever">
-                        <div class="form-text">Se va a generar un código único para compartir con tus amigos.</div>
+
+        {% if grupo %}
+            <!-- Grupo creado exitosamente -->
+            <div class="card shadow-sm border-0">
+                <div class="card-body p-4 text-center">
+                    <div style="font-size: 3rem;">🎉</div>
+                    <h3 class="fw-bold mt-2">¡Grupo creado!</h3>
+                    <p class="text-muted">Compartí este código con tus amigos:</p>
+
+                    <div class="bg-dark text-white rounded-3 py-4 px-3 my-4">
+                        <div class="fs-1 fw-bold" style="letter-spacing: 6px;" id="codigo-texto">
+                            {{ grupo.codigo }}
+                        </div>
+                        <div class="text-muted small mt-1">{{ grupo.nombre }}</div>
                     </div>
-                    <button type="submit" class="btn btn-dark btn-lg w-100 fw-bold">
-                        Crear grupo
+
+                    <button onclick="copiarCodigo()" class="btn btn-outline-light btn-lg w-100 mb-3 bg-dark text-white" id="btn-copiar">
+                        📋 Copiar código
                     </button>
-                </form>
+
+                    <div class="d-grid gap-2 mt-2">
+                        <a href="/agregar/?codigo={{ grupo.codigo }}" class="btn btn-success btn-lg fw-bold">
+                            ➕ Agregar mi horario ahora
+                        </a>
+                        <a href="/?codigo={{ grupo.codigo }}" class="btn btn-outline-secondary">
+                            Ver el grupo
+                        </a>
+                    </div>
+                </div>
             </div>
-        </div>
+
+        {% else %}
+            <!-- Formulario para crear grupo -->
+            <div class="card shadow-sm border-0">
+                <div class="card-body p-4">
+                    <h3 class="card-title text-center mb-4 fw-bold">Crear un grupo 👥</h3>
+                    {% if error %}
+                        <div class="alert alert-danger">{{ error }}</div>
+                    {% endif %}
+                    <form method="POST">
+                        {% csrf_token %}
+                        <div class="mb-4">
+                            <label class="form-label fw-bold">Nombre del grupo:</label>
+                            <input type="text" name="nombre" class="form-control form-control-lg"
+                                   required placeholder="Ej: Amigos de Ingeniería">
+                            <div class="form-text">Se va a generar un código único para compartir.</div>
+                        </div>
+                        <button type="submit" class="btn btn-dark btn-lg w-100 fw-bold">
+                            Crear grupo
+                        </button>
+                    </form>
+                </div>
+            </div>
+        {% endif %}
+
         <div class="text-center mt-4">
             <a href="/" class="text-decoration-none text-muted">← Volver al inicio</a>
         </div>
     </div>
+
+    <script>
+        function copiarCodigo() {
+            const codigo = document.getElementById('codigo-texto').innerText.trim();
+            navigator.clipboard.writeText(codigo).then(() => {
+                const btn = document.getElementById('btn-copiar');
+                btn.innerText = '✅ ¡Copiado!';
+                setTimeout(() => { btn.innerText = '📋 Copiar código'; }, 2000);
+            });
+        }
+    </script>
 </body>
 </html>
