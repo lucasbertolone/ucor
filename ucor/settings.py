@@ -11,8 +11,8 @@ SECRET_KEY = os.environ.get('SECRET_KEY', 'django-insecure-e*4r8%w@z@lyc5&rwj^)w
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.environ.get('DEBUG', 'False') == 'True'
 
-ALLOWED_HOSTS = ['ucor-production.up.railway.app']
-CSRF_TRUSTED_ORIGINS = ['https://ucor-production.up.railway.app']
+ALLOWED_HOSTS = ['ucor.up.railway.app']
+CSRF_TRUSTED_ORIGINS = ['https://ucor.up.railway.app']
 
 # Application definition
 INSTALLED_APPS = [
