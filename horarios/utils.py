@@ -40,8 +40,13 @@ def _importar_ics(url, usuario):
         descripcion = str(componente.get('description', ''))
         texto_busqueda = (ramo_original + " " + descripcion).lower()
 
+<<<<<<< HEAD
         palabras_clave = ["catedra", "cátedra", "auxiliar", "laboratorio", "lab", "control", "taller"]
         if not any(palabra in texto_busqueda for palabra in palabras_clave):
+=======
+        # Filtro de cátedras y auxiliares
+        if "catedra" not in texto_busqueda and "laboratorio" not in texto_busqueda and "control" not in texto_busqueda and "cátedra" not in texto_busqueda and "auxiliar" not in texto_busqueda and "seminario" not in texto_busqueda and "teórica plenaria" not in texto_busqueda and "ayudantía" not in texto_busqueda and "ejercicio" not in texto_busqueda:
+>>>>>>> 0da8832e5f735d60ae9926c277c9c1cb811c0d8f
             continue
 
         # La sala puede venir en LOCATION o al final del SUMMARY después de \n
