@@ -4,7 +4,6 @@ import random
 import string
 
 def generar_codigo():
-    """Genera un código único tipo UCO-4X7K"""
     chars = string.ascii_uppercase + string.digits
     codigo = ''.join(random.choices(chars, k=4))
     return f"UCO-{codigo}"
@@ -17,6 +16,13 @@ class Grupo(models.Model):
 
     def __str__(self):
         return f"{self.nombre} ({self.codigo})"
+
+class PerfilUsuario(models.Model):
+    usuario = models.OneToOneField(User, on_delete=models.CASCADE, related_name='perfil')
+    url_ics = models.URLField(max_length=500, blank=True, null=True)
+
+    def __str__(self):
+        return f"Perfil de {self.usuario.username}"
 
 class BloqueHorario(models.Model):
     DIAS_SEMANA = [

@@ -3,7 +3,7 @@ from django.contrib.auth.models import User
 from .models import BloqueHorario, Grupo
 from datetime import datetime
 import pytz
-from .utils import sincronizar_desde_url
+from .utils import sincronizar_desde_url, resincronizar_usuario
 import json
 
 def estado_amigos(request):
@@ -164,6 +164,12 @@ def comparador_horarios(request):
 
     for bloque in bloques:
         nombre_amigo = bloque.usuario.username
+        if nombre_amigo =="Lucas":
+            color_usuario[nombre_amigo] = "#80e452"  
+        if nombre_amigo =="helena":
+            color_usuario[nombre_amigo] = "#D2042D"  
+        if nombre_amigo =="Maria💞":
+            color_usuario[nombre_amigo] = "#e900c2"  
         if nombre_amigo not in color_usuario:
             color_usuario[nombre_amigo] = paleta_colores[len(color_usuario) % len(paleta_colores)]
         if bloque.fecha:
@@ -195,3 +201,33 @@ def cambiar_grupo(request):
     response = redirect('/')
     response.delete_cookie('ucor_grupo')
     return response
+
+
+def resincronizar(request):
+    """Re-sincroniza el horario de un usuario usando su URL guardada"""
+    if request.method == 'POST':
+        nombre = request.POST.get('nombre', '').strip()
+        codigo = request.POST.get('codigo', '').strip().upper()
+        try:
+            usuario = User.objects.get(username=nombre)
+            exito = resincronizar_usuario(usuario)
+            if exito:
+                return redirect(f'/?codigo={codigo}')
+            else:
+                return render(request, 'resincronizar.html', {
+                    'error': f'No hay URL guardada para {nombre}. Agregá tu horario primero.',
+                    'codigo': codigo,
+                })
+        except User.DoesNotExist:
+            return render(request, 'resincronizar.html', {
+                'error': f'No existe el usuario {nombre}.',
+                'codigo': codigo,
+            })
+    codigo = request.GET.get('codigo', '') or request.COOKIES.get('ucor_grupo', '')
+    grupo = None
+    if codigo:
+        try:
+            grupo = Grupo.objects.get(codigo=codigo)
+        except Grupo.DoesNotExist:
+            pass
+    return render(request, 'resincronizar.html', {'codigo': codigo, 'grupo': grupo})

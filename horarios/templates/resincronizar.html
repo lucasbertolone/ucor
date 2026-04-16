@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>UCor - Actualizar horario</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body class="bg-light">
+    <nav class="navbar navbar-dark bg-dark mb-4">
+        <div class="container-fluid justify-content-center">
+            <span class="navbar-brand mb-0 h1 fs-2">🎓 UCor</span>
+        </div>
+    </nav>
+    <div class="container" style="max-width: 500px;">
+        <div class="card shadow-sm border-0">
+            <div class="card-body p-4">
+                <h3 class="card-title text-center mb-2 fw-bold">Actualizar mi horario 🔄</h3>
+                <p class="text-muted text-center mb-4">Usamos tu link guardado para traer las últimas clases y pruebas.</p>
+
+                {% if error %}
+                    <div class="alert alert-danger">{{ error }}</div>
+                {% endif %}
+
+                <form method="POST">
+                    {% csrf_token %}
+                    <input type="hidden" name="codigo" value="{{ codigo }}">
+                    <div class="mb-4">
+                        <label class="form-label fw-bold">Tu nombre o alias:</label>
+                        <input type="text" name="nombre" class="form-control form-control-lg"
+                               required placeholder="Ej: Lucas">
+                        <div class="form-text">Tiene que ser el mismo nombre con el que agregaste tu horario.</div>
+                    </div>
+                    <button type="submit" class="btn btn-success btn-lg w-100 fw-bold">
+                        🔄 Actualizar mi horario
+                    </button>
+                </form>
+            </div>
+        </div>
+        <div class="text-center mt-4 mb-5">
+            <a href="/?codigo={{ codigo }}" class="text-decoration-none text-muted">← Volver al inicio</a>
+        </div>
+    </div>
+</body>
+</html>

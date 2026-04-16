@@ -1,6 +1,6 @@
 from django.contrib import admin
 from django.urls import path
-from horarios.views import estado_amigos, agregar_horario, comparador_horarios, crear_grupo, grupo_creado, cambiar_grupo
+from horarios.views import estado_amigos, agregar_horario, comparador_horarios, crear_grupo, grupo_creado, cambiar_grupo, resincronizar
 
 urlpatterns = [
     path('admin/', admin.site.urls),
@@ -10,4 +10,5 @@ urlpatterns = [
     path('crear-grupo/', crear_grupo),
     path('grupo-creado/', grupo_creado),
     path('cambiar-grupo/', cambiar_grupo),
+    path('actualizar/', resincronizar),
 ]
