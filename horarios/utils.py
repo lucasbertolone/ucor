@@ -25,7 +25,7 @@ def sincronizar_desde_url(url, nombre_usuario):
         texto_busqueda = (ramo_original + " " + descripcion).lower()
 
         # Filtro de cátedras y auxiliares
-        if "catedra" not in texto_busqueda and "cátedra" not in texto_busqueda and "auxiliar" not in texto_busqueda:
+        if "catedra" not in texto_busqueda and "laboratorio" not in texto_busqueda and "control" not in texto_busqueda and "cátedra" not in texto_busqueda and "auxiliar" not in texto_busqueda and "seminario" not in texto_busqueda and "teórica plenaria" not in texto_busqueda and "ayudantía" not in texto_busqueda and "ejercicio" not in texto_busqueda:
             continue
 
         sala = str(componente.get('location', ''))
