@@ -88,6 +88,20 @@ def _importar_ics(url, usuario):
             mismo_dia = ultimo['fecha'] == evento['fecha']
             consecutivo = ultimo['hora_fin'] == evento['hora_inicio']
             if mismo_ramo and mismo_dia and consecutivo:
+                ultimo['hora_fin'] = evento['hora_fin']  # Extender el bloque
+                continue
+        eventos_fusionados.append(evento)
+
+    for e in eventos_fusionados:
+        BloqueHorario.objects.create(
+            usuario=usuario,
+            ramo=e['ramo'],
+            fecha=e['fecha'],
+            dia_semana=e['dia_semana'],
+            hora_inicio=e['hora_inicio'],
+            hora_fin=e['hora_fin'],
+            sala=e['sala'],
+        )
     respuesta = requests.get(url)
     respuesta.raise_for_status()
     calendario = Calendar.from_ical(respuesta.content)
